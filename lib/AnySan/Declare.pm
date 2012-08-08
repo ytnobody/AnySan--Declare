@@ -1,7 +1,52 @@
 package AnySan::Declare;
 use strict;
 use warnings;
+use AnySan;
+use Class::Load ':all';
+use Exporter 'import';
+
 our $VERSION = '0.01';
+our @EXPORT = qw( set_provider provider rule start );
+our $PROVIDER;
+our %MAPPER;
+
+sub set_provider (%) {
+    my ( $provider_class, $server, %opts ) = @_;
+    my $klass = "AnySan::Provider::$provider_class";
+    my $loader_function = lc($provider_class);
+    unless ( is_class_loaded($klass) ) {
+        load_class($klass);
+    }
+    {
+        no strict 'refs';
+        $PROVIDER = &{join( '::', $klass, $loader_function )}( $server, %opts );
+    }
+}
+
+sub provider () {
+    return $PROVIDER;
+}
+
+sub rule ($&) {
+    my ( $matcher, $code ) = @_;
+    $MAPPER{$matcher} = $code;
+}
+
+sub start () {
+    AnySan->register_listener(
+        echo => {
+            cb => sub {
+                my $receive = shift;
+                for my $key ( keys %MAPPER ) {
+                    next unless $receive->message =~ $key;
+                    my $code = $MAPPER{$key};
+                    $code->( $receive );
+                }
+            },
+        }
+    );
+    AnySan->run;
+}
 
 1;
 __END__
