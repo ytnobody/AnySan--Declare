@@ -38,9 +38,10 @@ sub start () {
             cb => sub {
                 my $receive = shift;
                 for my $key ( keys %MAPPER ) {
-                    next unless $receive->message =~ $key;
-                    my $code = $MAPPER{$key};
-                    $code->( $receive );
+                    if ( my @matched = $receive->message =~ $key ) {
+                        my $code = $MAPPER{$key};
+                        $code->( $receive, @matched );
+                    }
                 }
             },
         }
